@@ -12,8 +12,9 @@ use Cwd;
 use Time::HiRes;
 
 use Term::ANSIColor;
+use Scalar::Util qw(looks_like_number);
 
-
+use feature "switch";
 
 ##########################################################################################
 ##########################################################################################
@@ -33,6 +34,7 @@ my @files;
 my $output = "";
 my $details;
 my $pass;
+my $config = "";
 #my $makeGraphs = '';
 
 # General arguments
@@ -48,6 +50,7 @@ GetOptions(
 	'f|files=s'	 		=> \@files,
 	'o|output=s'		=> \$output,
 	'd|details'			=> \$details,
+	'c|config=s'		=> \$config,
 	'p|pass-only'		=> \$pass,
 #	'g|makeGraphs'		=> \$makeGraphs,
 	'v|verbosity=i'		=> \$verbosity,
@@ -60,10 +63,6 @@ pod2usage(-verbose => 2) if $man;
 
 
 # Test arguments
-pod2usage(colored(['Red'], "Error :
-	Hello, I am so lost...
-	I need at least 2 VCF on input.
-	Thanks !", "\n")) unless (@files >= 2);
 
 # Check the files
 foreach my $file (@files) {
@@ -99,7 +98,29 @@ if ($output ne "") {
 ##########################################################################################
 ##########################################################################################
 
-my %HEADER;
+my %hash_filter;
+open(CONF,"$config") or die ("cannot open $config $!");
+my $i = 1;
+while(<CONF>){
+	chomp();
+	my @line = split("\t");
+
+	$hash_filter{$line[4]}{"cond"} = $line[5];
+	$hash_filter{$line[4]}{"step"} = $line[6];
+	$hash_filter{$line[4]}{"rules"}{$i}{"id"} = $line[0];
+	$hash_filter{$line[4]}{"rules"}{$i}{"val"} = $line[1];
+	$hash_filter{$line[4]}{"rules"}{$i}{"is"} = $line[2];
+	$hash_filter{$line[4]}{"rules"}{$i}{"for"} = $line[3];
+
+	$i++;
+}
+
+print Dumper \%hash_filter;
+
+
+##########################################################################################
+##########################################################################################
+
 my %VARIANTS;
 
 foreach my $file (@files) {
@@ -110,67 +131,47 @@ foreach my $file (@files) {
 	my @all_lines;
 	while(<VCF>) {
 		chomp($_);
-		if(/^#/) {
-			if(/INFO=<ID=([^,]*).*Description="([^"]*).*/) {
-				$HEADER{$file}{"INFO"}{$1}{"desc"} = $2;
-				$HEADER{$file}{"INFO"}{$1}{"line"} = $_;
-			}
-			if(/FORMAT=<ID=([^,]*).*Description="([^"]*).*/) {
-				$HEADER{$file}{"FORMAT"}{$1}{"desc"} = $2;
-				$HEADER{$file}{"FORMAT"}{$1}{"line"} = $_;
-			}
-		} else {
-			my @line = split("\t");
-#			print Dumper \@line;
-			#$VARIANTS{$file}{"$line[0]_$line[1]_$line[3]_$line[4]"} = 1 ;
-			unless ($pass){
-				push(@{$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"files"}},$file) ;
-				$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"lines"} = $_ ;
-			} else {
-				if ($line[6] eq "PASS" && length($line[3]) == 1 && length($line[4]) == 1) {
-					push(@{$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"files"}},$file) ;
-					$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"lines"} = $_ ;
-				}
-			}
+		if($_ !~ /^#/) {
+			my $line = $_;
+			#print colored(['Blue'], "$_","\n");
 			my %hash_line = parse_line($_);
+			foreach my $key (sort keys(%hash_filter)) {
+				my %boolean_rules = (
+					1 => 0,
+					0 => 0
+				);
+				foreach my $rules (keys $hash_filter{$key}{"rules"}) {
+					$boolean_rules{check_filter($hash_filter{$key}{"rules"}{$rules},\%hash_line)}++;
+				}
+
+				my $verify = check_condition($hash_filter{$key}{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
+
+				for ($hash_filter{$key}{"step"}) {
+					when("stop")	{ if ($verify) {print $line."\n"; last; } else { last ;} }
+					when("get")		{ if ($verify) {print $line."\n"; last; } else { next ; }}
+					when("next")	{ $verify ? next : last; }
+				}
+
+				#check_condition($hash_filter{$key}{"cond"},@boolean_rules);
+
+				#if ($hash_filter{$key}{"step"} eq "get" ) {
+
+					#print $_;
+					#last;
+				#} elsif ($hash_filter{$key}{"step"} eq "next" ) {
+				#	if ($hash_filter{$key}{"cond"} eq "OR") {
+				#	}
+					#print $_;
+					#next;
+				#}
+				#print $key."\n";
+			}
 			#print Dumper \%hash_line;
-			push(@all_lines,\%hash_line);
+			#push(@all_lines,\%hash_line);
 		}
 	}
 	#print Dumper \@all_lines;
 	close(VCF);
-}
-
-##########################################################################################
-##########################################################################################
-
-
-my %TREAT_VARIANTS;
-my %VCF;
-foreach my $key (keys(%VARIANTS)){
-	if( @{$VARIANTS{$key}{"files"}} == 1) {
-		my $name = substr(${$VARIANTS{$key}{"files"}}[0],0,-4);
-		$TREAT_VARIANTS{$name}{"count"} += 1;
-		$TREAT_VARIANTS{$name}{"vcf"} .= $VARIANTS{$key}{"lines"}."\n";
-	} else {
-		my $name = "common_";
-		foreach my $names (@{$VARIANTS{$key}{"files"}}) {
-			$name .= substr($names,0,-4)."_AND_";
-		}
-		$name = substr($name, 0, -5);
-		$TREAT_VARIANTS{$name}{"count"} += 1;
-		$TREAT_VARIANTS{$name}{"vcf"} .= $VARIANTS{$key}{"lines"}."\n";
-	}
-}
-
-# print Dumper \%HEADER;
-# print Dumper \%VARIANTS;
-# print Dumper \%TREAT_VARIANTS;
-
-foreach my $key (keys(%TREAT_VARIANTS)) {
-	open(FILE, ">".$output.$key.".compare") or die("Cannot open $output$key");
-	print FILE $TREAT_VARIANTS{$key}{"vcf"};
-	print $key." : ".$TREAT_VARIANTS{$key}{"count"}."\n";
 }
 
 ##########################################################################################
@@ -215,6 +216,55 @@ sub parse_line {
 	return %hash_line;
 }
 
+sub check_filter {
+	my $hash_1 = shift(@_);
+	my $hash_2 = shift(@_);
+	#my %line = shift(@_);
+	my %hash_rule = %$hash_1;
+	my %hash_line = %$hash_2;
+#	print Dumper \%hash_rule;
+#	print Dumper \%hash_line;
+
+	for($hash_rule{"is"} )
+	{
+		when("num") {
+			if ($hash_line{"infos"}{$hash_rule{"id"}} eq ".") {
+				$hash_line{"infos"}{$hash_rule{"id"}} = 0;
+			}
+			for ($hash_rule{"for"}) {
+				when("eq")		{ $hash_line{"infos"}{$hash_rule{"id"}} == $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("supeq")	{ $hash_line{"infos"}{$hash_rule{"id"}} >= $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("infeq")	{ $hash_line{"infos"}{$hash_rule{"id"}} <= $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("sup")		{ $hash_line{"infos"}{$hash_rule{"id"}} >  $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("inf")		{ $hash_line{"infos"}{$hash_rule{"id"}} <  $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("ne")		{ $hash_line{"infos"}{$hash_rule{"id"}} != $hash_rule{"val"} ? return 1 : return 0 ; }
+				default			{return 0}
+			}
+		}
+		when("str") {
+			for ($hash_rule{"for"}) {
+				when("eq")		{ $hash_line{"infos"}{$hash_rule{"id"}} eq $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("ne")		{ $hash_line{"infos"}{$hash_rule{"id"}} ne $hash_rule{"val"} ? return 1 : return 0 ; }
+				default			{return 0}
+			}
+		}
+	}
+	#$hash_line{"infos"}{$hash_rule{"id"}};
+}
+
+sub check_condition {
+	my $cond = shift(@_);
+	my $true = shift(@_);
+	my $false = shift(@_);
+
+
+
+	for($cond ) {
+		when("OR")	{ ($true >= 1) ? return 1 : 0 ; }
+		when("AND")	{ ($false == 0) ? return 1 : 0 ; }
+	}
+	#$hash_line{"infos"}{$hash_rule{"id"}};
+}
 
 ##########################################################################################
 ##########################################################################################
@@ -231,7 +281,7 @@ compare_leon.pl - Compare Leon compression algorithm with gzip (generally used) 
 
 =head1 VERSION
 
-version 0.01
+version 0.01 - alpha test
 
 =head1 SYNOPSIS
 
@@ -268,18 +318,6 @@ Charles VAN GOETHEM
 
 =item -
 Pauline SARRAROLS
-
-                    /
-               ,.. /
-             ,'   ';
-  ,,.__    _,' /';  .
- :','  ~~~~    '. '~
-:' (   )         )::,
-'. '. .=----=..-~  .;'
- '  ;'  ::   ':.  '"
-   (:   ':    ;)
-    \\   '"  ./
-     '"      '"
 
 =back
 
