@@ -115,7 +115,7 @@ while(<CONF>){
 	$i++;
 }
 
-print Dumper \%hash_filter;
+#print Dumper \%hash_filter;
 
 
 ##########################################################################################
@@ -140,17 +140,24 @@ foreach my $file (@files) {
 					1 => 0,
 					0 => 0
 				);
+				#print Dumper \%boolean_rules;
 				foreach my $rules (keys $hash_filter{$key}{"rules"}) {
 					$boolean_rules{check_filter($hash_filter{$key}{"rules"}{$rules},\%hash_line)}++;
 				}
 
 				my $verify = check_condition($hash_filter{$key}{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
-
+				#print $verify."\n";
+				#print Dumper \%boolean_rules;
+				my $check ="";
 				for ($hash_filter{$key}{"step"}) {
-					when("stop")	{ if ($verify) {print $line."\n"; last; } else { last ;} }
-					when("get")		{ if ($verify) {print $line."\n"; last; } else { next ; }}
-					when("next")	{ $verify ? next : last; }
+					when("stop")	{ if ($verify) {print $line."\n"; $check = "next_line"; } else { $check = "next_line"} }
+					when("get")		{ if ($verify) {print $line."\n"; $check = "next_line"; } else { next ; }}
+					when("next")	{ if($verify) { next; }else { $check = "next_line"} }
 				}
+				if ($check eq "next_line") {
+					last;
+				}
+
 
 				#check_condition($hash_filter{$key}{"cond"},@boolean_rules);
 
@@ -228,21 +235,23 @@ sub check_filter {
 	for($hash_rule{"is"} )
 	{
 		when("num") {
-			if ($hash_line{"infos"}{$hash_rule{"id"}} eq ".") {
-				$hash_line{"infos"}{$hash_rule{"id"}} = 0;
+			my $val = $hash_line{"infos"}{$hash_rule{"id"}};
+			if ($val eq ".") {
+				$val = 0;
 			}
 			for ($hash_rule{"for"}) {
-				when("eq")		{ $hash_line{"infos"}{$hash_rule{"id"}} == $hash_rule{"val"} ? return 1 : return 0 ; }
-				when("supeq")	{ $hash_line{"infos"}{$hash_rule{"id"}} >= $hash_rule{"val"} ? return 1 : return 0 ; }
-				when("infeq")	{ $hash_line{"infos"}{$hash_rule{"id"}} <= $hash_rule{"val"} ? return 1 : return 0 ; }
-				when("sup")		{ $hash_line{"infos"}{$hash_rule{"id"}} >  $hash_rule{"val"} ? return 1 : return 0 ; }
-				when("inf")		{ $hash_line{"infos"}{$hash_rule{"id"}} <  $hash_rule{"val"} ? return 1 : return 0 ; }
-				when("ne")		{ $hash_line{"infos"}{$hash_rule{"id"}} != $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("eq")		{ $val == $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("supeq")	{ $val >= $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("infeq")	{ $val <= $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("sup")		{ $val >  $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("inf")		{ $val <  $hash_rule{"val"} ? return 1 : return 0 ; }
+				when("ne")		{ $val != $hash_rule{"val"} ? return 1 : return 0 ; }
 				default			{return 0}
 			}
 		}
 		when("str") {
 			for ($hash_rule{"for"}) {
+				#print $hash_line{"infos"}{$hash_rule{"id"}}."\n";
 				when("eq")		{ $hash_line{"infos"}{$hash_rule{"id"}} eq $hash_rule{"val"} ? return 1 : return 0 ; }
 				when("ne")		{ $hash_line{"infos"}{$hash_rule{"id"}} ne $hash_rule{"val"} ? return 1 : return 0 ; }
 				default			{return 0}
@@ -257,7 +266,9 @@ sub check_condition {
 	my $true = shift(@_);
 	my $false = shift(@_);
 
-
+	#print "cond : $cond \n";
+	#print "nb true : $true \n";
+	#print "nb false : $false \n";
 
 	for($cond ) {
 		when("OR")	{ ($true >= 1) ? return 1 : 0 ; }
@@ -277,11 +288,11 @@ __END__
 
 =head1 NAME
 
-compare_leon.pl - Compare Leon compression algorithm with gzip (generally used) for fastQ.
+vcf-filter.pl - Filter a vcf file with a list of decision on a conf file
 
 =head1 VERSION
 
-version 0.01 - alpha test
+version 0.02 - alpha test without bugs -- "last_but_not_least"
 
 =head1 SYNOPSIS
 
