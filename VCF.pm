@@ -1,4 +1,5 @@
-package Parser;
+package VCF;
+
 use Data::Dumper;
 =head2 parse_line
     About   : Reads a VCF line and splits it into a hash.
@@ -66,22 +67,30 @@ sub parse_info {
 	return \%hash_info;
 }
 =head2 parse_format
-    About   : Parse field info
-    Usage   : my $x = parse_info($info);
+    About   : Parse field format
+    Usage   : my $x = parse_format($format);
     Args    : field to parse.
 =cut
 sub parse_format {
 	my ($format,@formats) = @_;
 
-	my %hash_info;
+	my @order = split(":",$format);
 
-	print Dumper @formats;
+	my %hash_formats;
+	my $j = 0;
+	foreach my $value (@formats) {
+		$j++;
+		my @elements = split(":",$value);
+		foreach my $i (0..scalar(@order)-1) {
+			$hash_formats{"sample_".$j}{$order[$i]} = $elements[$i]
+		}
+	}
 
-	return \%hash_info;
+	return \%hash_formats;
 }
 =head2 parse_meta
     About   : Parse meta information
-    Usage   : my $x = parse_meta($info);
+    Usage   : my $x = parse_meta(line);
     Args    : line to parse
 =cut
 sub parse_meta {
@@ -94,7 +103,7 @@ sub parse_meta {
 		if($7) {$hash_meta{"meta"}{$1}{$2}{"Description"} = $7};
 		if($6) {$hash_meta{"meta"}{$1}{$2}{"Type"} = $6};
 		if($4) {$hash_meta{"meta"}{$1}{$2}{"Number"} = $4};
-		$hash_meta{"meta"}{$1}{$2}{"line"} = $_;
+		$hash_meta{"meta-informations"}{$1}{$2}{"line"} = $_;
 	}  else {
 		$hash_meta{"header"} = $_;
 	}
