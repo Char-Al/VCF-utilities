@@ -319,6 +319,7 @@ This script compress and uncompress automatically some fastQ file.
 
 	-o,--output=repertory			You can specify the output repertory (default Current)
 	-g,--makeGraphs					Generate automatically awesome graphs with R and ggplot2
+	-p,--pass						Filter only on PASS variants
 
 =head1 AUTHORS
 
