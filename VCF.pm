@@ -4,6 +4,9 @@ use Data::Dumper;
 use File::Basename;
 use Hash::Merge qw(merge);
 
+use feature "switch";
+no warnings 'experimental';
+
 
 =head2 read_vcf
     About   : Reads a VCF and tranform it to an hash
@@ -149,7 +152,7 @@ sub parse_meta {
 		if($6) {$hash_meta{"meta-informations"}{$1}{$2}{"Type"} = $6};
 		if($4) {$hash_meta{"meta-informations"}{$1}{$2}{"Number"} = $4};
 		$hash_meta{"meta-informations"}{$1}{$2}{"line"} = $_;
-	}  else {
+	}  elsif($line =~ /^#CHROM/) {
 		substr($_, 0, 1) = "";
 		my @header = split("\t",$_);
 		$hash_meta{"header"} = \@header;
@@ -159,9 +162,17 @@ sub parse_meta {
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+=head2 vcf2tab
+    About   : Convert a vcf (hash) into a tab separate file
+    Usage   : my parse_meta($hash_vcf, $output);
+    Args    :
+		- hash of a vcf
+		- output_file
+=cut
 sub vcf2tab {
-	my ($self,$vcf,$output) = @_;
-	#print Dumper \$vcf;
+	my ($self, $header, $meta, $variants, $output) = @_;
+
+	open(FILE,">$output") or die "Cannot open file : '$output' $!";
 
 	my $line = "";
 	my @direct;
@@ -169,56 +180,277 @@ sub vcf2tab {
 	my @formats;
 
 	foreach my $i (0..7-1) {
-		$line .= $vcf->{"header"}[$i]."\t";
-		push(@direct, $vcf->{"header"}[$i]);
+		$line .= $$header[$i]."\t";
+		push(@direct, $$header[$i]);
 	}
-	foreach my $info (sort keys $vcf->{'meta-informations'}->{'INFO'}) {
+	foreach my $info (sort keys $meta->{'INFO'}) {
 		$line .= $info."\t";
 		push(@infos, $info);
 	}
 
-	foreach my $format (sort keys $vcf->{'meta-informations'}->{'FORMAT'}) {
+	foreach my $format (sort keys $meta->{'FORMAT'}) {
 		push(@formats,$format);
 	}
 
-	foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
+	foreach my $i (9..scalar(@{$header})-1) {
 		foreach my $format (@formats) {
-			$line .= $vcf->{'header'}[$i]."_".$format."\t";
+			$line .= $$header[$i]."_".$format."\t";
 		}
 	}
 	chop($line);
-	print $line."\n";
+	print FILE $line."\n";
 
-	foreach my $variant (sort keys $vcf->{"variants"}) {
+	foreach my $variant (sort keys $variants) {
 		$line = "";
-		my $test = $vcf->{"variants"}->{$variant};
+		my $hash_variant = $variants->{$variant};
 		foreach my $val (@direct){
 			#print $val;
-			$line .= ${$test}->{$val}."\t";
+			$line .= ${$hash_variant}->{$val}."\t";
 		}
 		foreach my $info (@infos) {
-			if (exists (${$test}->{"INFO"}->{$info})) {
-				$line .= ${$test}->{"INFO"}->{$info}."\t";
+			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
+				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
 			} else {
 				$line .= ".\t";
 			}
-			#print Dumper %${$test}->{"INFO"};
 		}
 
-		foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
-			my $sample = $vcf->{'header'}[$i];
+		foreach my $i (9..scalar(@{$header})-1) {
+			my $sample = $$header[$i];
 			foreach my $format (@formats) {
-				if (exists (${$test}->{"FORMAT"}->{$sample}->{$format})) {
-					#print Dumper %${$test}->{"FORMAT"}->{$sample}->{$format};
-					$line .= ${$test}->{"FORMAT"}->{$sample}->{$format}."\t";
+				if (exists (${$hash_variant}->{"FORMAT"}->{$sample}->{$format})) {
+					$line .= ${$hash_variant}->{"FORMAT"}->{$sample}->{$format}."\t";
 				} else {
 					$line .= ".\t";
 				}
 			}
 		}
-		print $line."\n";
+		print FILE $line."\n";
 	}
+	close(FILE);
 
 }
+# sub vcf2tab_old {
+# 	my ($self,$vcf,$output) = @_;
+#
+# 	open(FILE,">$output") or die "Cannot open file : '$output' $!";
+#
+# 	my $line = "";
+# 	my @direct;
+# 	my @infos;
+# 	my @formats;
+#
+# 	foreach my $i (0..7-1) {
+# 		$line .= $vcf->{"header"}[$i]."\t";
+# 		push(@direct, $vcf->{"header"}[$i]);
+# 	}
+# 	foreach my $info (sort keys $vcf->{'meta-informations'}->{'INFO'}) {
+# 		$line .= $info."\t";
+# 		push(@infos, $info);
+# 	}
+#
+# 	foreach my $format (sort keys $vcf->{'meta-informations'}->{'FORMAT'}) {
+# 		push(@formats,$format);
+# 	}
+#
+# 	foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
+# 		foreach my $format (@formats) {
+# 			$line .= $vcf->{'header'}[$i]."_".$format."\t";
+# 		}
+# 	}
+# 	chop($line);
+# 	print FILE $line."\n";
+#
+# 	foreach my $variant (sort keys $vcf->{"variants"}) {
+# 		$line = "";
+# 		my $hash_variant = $vcf->{"variants"}->{$variant};
+# 		foreach my $val (@direct){
+# 			#print $val;
+# 			$line .= ${$hash_variant}->{$val}."\t";
+# 		}
+# 		foreach my $info (@infos) {
+# 			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
+# 				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
+# 			} else {
+# 				$line .= ".\t";
+# 			}
+# 		}
+#
+# 		foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
+# 			my $sample = $vcf->{'header'}[$i];
+# 			foreach my $format (@formats) {
+# 				if (exists (${$hash_variant}->{"FORMAT"}->{$sample}->{$format})) {
+# 					$line .= ${$hash_variant}->{"FORMAT"}->{$sample}->{$format}."\t";
+# 				} else {
+# 					$line .= ".\t";
+# 				}
+# 			}
+# 		}
+# 		print FILE $line."\n";
+# 	}
+# 	close(FILE);
+# }
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+=head2 vcfCondFilter
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub vcfCondFilter {
+	my ($self,$vcf,$cond) = @_;
+	my %filter;
+	foreach my $variant (sort keys $vcf->{"variants"}) {
+		my $hash_variant = $vcf->{"variants"}->{$variant};
+		foreach my $key (sort keys($cond)) {
+			my %boolean_rules = (
+				1 => 0,
+				0 => 0
+			);
+
+			foreach my $rules (sort keys $cond->{$key}->{"rules"}) {
+				# $boolean_rules{check_filter($cond{$key}{"rules"}{$rules},$variant)}++;
+				$boolean_rules{check_filter($cond->{$key}->{"rules"}->{$rules}, $vcf->{"variants"}->{$variant})}++;
+			}
+
+			my $verify = check_condition($cond->{$key}->{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
+
+			my $check ="";
+			#print $cond->{$key}->{"step"};
+			for ($cond->{$key}->{"step"}) {
+				when("next")	{ if ($verify) { next; }									else { $check = "next_line"}	}
+				when("get")		{ if ($verify) { $filter{$variant} = $vcf->{"variants"}->{$variant} ; $check = "next_line"; }	else { next ; }					}
+				when("stop")	{ if ($verify) { $filter{$variant} = $vcf->{"variants"}->{$variant} ; $check = "next_line"; }	else { $check = "next_line"}	}
+			}
+
+			if ($check eq "next_line") {
+				last;
+			}
+		}
+	}
+	return \%filter;
+}
+
+=head2 parseConfFile
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub parseConfFile {
+	my ($self, $config) = @_;
+
+	my %hash_filter;
+	open(CONF,"$config") or die ("cannot open $config $!");
+	my $i = 1;
+	while(<CONF>){
+		chomp();
+		my @line = split("\t");
+
+		if($line[1] eq "INFO" or $line[1] eq "FORMAT") {
+			$hash_filter{$line[0]}{"rules"}{$i}{"target"}	= $line[1];
+			$hash_filter{$line[0]}{"rules"}{$i}{"id"}		= $line[2];
+			$hash_filter{$line[0]}{"rules"}{$i}{"is"}		= $line[3];
+			$hash_filter{$line[0]}{"rules"}{$i}{"for"}		= $line[4];
+			$hash_filter{$line[0]}{"rules"}{$i}{"val"}		= $line[5];
+
+			$hash_filter{$line[0]}{"cond"} = $line[6];
+			$hash_filter{$line[0]}{"step"} = $line[7];
+		} else {
+			$hash_filter{$line[0]}{"rules"}{$i}{"target"}	= "BASE";
+			$hash_filter{$line[0]}{"rules"}{$i}{"id"}		= $line[1];
+			$hash_filter{$line[0]}{"rules"}{$i}{"is"}		= $line[2];
+			$hash_filter{$line[0]}{"rules"}{$i}{"for"}		= $line[3];
+			$hash_filter{$line[0]}{"rules"}{$i}{"val"}		= $line[4];
+
+			$hash_filter{$line[0]}{"cond"} = $line[5];
+			$hash_filter{$line[0]}{"step"} = $line[6];
+		}
+
+		$i++;
+	}
+	return \%hash_filter;
+}
+
+=head2 check_filter
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub check_filter {
+	my ($hash_rule, $hash_line) = @_;
+		#print Dumper $hash_rule;
+		#print Dumper $hash_line;
+
+	if($hash_rule->{"target"} eq "BASE"){
+		my $val = ${$hash_line}->{$hash_rule->{"id"}};
+		#print Dumper $val;
+
+		for($hash_rule->{"is"}) {
+			when("Num") {
+				for ($hash_rule->{"for"}) {
+					when("==")	{ $val == $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("!=")	{ $val != $hash_rule->{"val"} ? return 1 : return 0 ; }
+					default		{return 0}
+				}
+			}
+			when("Str") {
+				for ($hash_rule->{"for"}) {
+					when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
+					default		{return 0}
+				}
+			}
+		}
+	} else {
+		my $val = ${$hash_line}->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
+
+		for($hash_rule->{"is"}) {
+			when("Num") {
+				for ($hash_rule->{"for"}) {
+					when("==")	{ $val == $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("!=")	{ $val != $hash_rule->{"val"} ? return 1 : return 0 ; }
+					default		{return 0}
+				}
+			}
+			when("Str") {
+				for ($hash_rule->{"for"}) {
+					when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+					when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
+					default		{return 0}
+				}
+			}
+		}
+	}
+}
+
+=head2 check_condition
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub check_condition {
+	my ($cond, $true, $false) = @_;
+
+	for($cond ) {
+		when("or")	{ ($true >= 1) ? return 1 : return 0 ; }
+		when("and")	{ ($false == 0) ? return 1 : return 0 ; }
+	}
+}
 1;

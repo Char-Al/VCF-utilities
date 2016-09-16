@@ -1,4 +1,5 @@
 data_p/
 *.vcf
 *.conf
+*.tab
 .DS_Store
