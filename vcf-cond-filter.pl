@@ -86,7 +86,7 @@ my $hash_vcf = VCF->read_vcf($file);
 my $hash_cond = VCF->parseConfFile($conf);
 my $filter = VCF->vcfCondFilter($hash_vcf, $hash_cond);
 
-my ($name, $dir, $ext) = fileparse($file,, qr/\.[^.]*/);
+($name, $dir, $ext) = fileparse($file, qr/\.[^.]*/);
 my $output_file = $output.$name.".filter.tab";
 
 VCF->vcf2tab($hash_vcf->{"header"}, $hash_vcf->{"meta-informations"}, $filter,$output_file);

@@ -230,66 +230,6 @@ sub vcf2tab {
 	close(FILE);
 
 }
-# sub vcf2tab_old {
-# 	my ($self,$vcf,$output) = @_;
-#
-# 	open(FILE,">$output") or die "Cannot open file : '$output' $!";
-#
-# 	my $line = "";
-# 	my @direct;
-# 	my @infos;
-# 	my @formats;
-#
-# 	foreach my $i (0..7-1) {
-# 		$line .= $vcf->{"header"}[$i]."\t";
-# 		push(@direct, $vcf->{"header"}[$i]);
-# 	}
-# 	foreach my $info (sort keys $vcf->{'meta-informations'}->{'INFO'}) {
-# 		$line .= $info."\t";
-# 		push(@infos, $info);
-# 	}
-#
-# 	foreach my $format (sort keys $vcf->{'meta-informations'}->{'FORMAT'}) {
-# 		push(@formats,$format);
-# 	}
-#
-# 	foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
-# 		foreach my $format (@formats) {
-# 			$line .= $vcf->{'header'}[$i]."_".$format."\t";
-# 		}
-# 	}
-# 	chop($line);
-# 	print FILE $line."\n";
-#
-# 	foreach my $variant (sort keys $vcf->{"variants"}) {
-# 		$line = "";
-# 		my $hash_variant = $vcf->{"variants"}->{$variant};
-# 		foreach my $val (@direct){
-# 			#print $val;
-# 			$line .= ${$hash_variant}->{$val}."\t";
-# 		}
-# 		foreach my $info (@infos) {
-# 			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
-# 				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
-# 			} else {
-# 				$line .= ".\t";
-# 			}
-# 		}
-#
-# 		foreach my $i (9..scalar(@{$vcf->{'header'}})-1) {
-# 			my $sample = $vcf->{'header'}[$i];
-# 			foreach my $format (@formats) {
-# 				if (exists (${$hash_variant}->{"FORMAT"}->{$sample}->{$format})) {
-# 					$line .= ${$hash_variant}->{"FORMAT"}->{$sample}->{$format}."\t";
-# 				} else {
-# 					$line .= ".\t";
-# 				}
-# 			}
-# 		}
-# 		print FILE $line."\n";
-# 	}
-# 	close(FILE);
-# }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -381,60 +321,35 @@ sub check_filter {
 	my ($hash_rule, $hash_line) = @_;
 		#print Dumper $hash_rule;
 		#print Dumper $hash_line;
-
+	my $val = "";
 	if($hash_rule->{"target"} eq "BASE"){
-		my $val = ${$hash_line}->{$hash_rule->{"id"}};
-		#print Dumper $val;
+		$val = ${$hash_line}->{$hash_rule->{"id"}};
+	} else {
+		$val = ${$hash_line}->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
+	}
+	#print Dumper $val;
 
-		for($hash_rule->{"is"}) {
-			when("Num") {
-				for ($hash_rule->{"for"}) {
-					when("==")	{ $val == $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("!=")	{ $val != $hash_rule->{"val"} ? return 1 : return 0 ; }
-					default		{return 0}
-				}
-			}
-			when("Str") {
-				for ($hash_rule->{"for"}) {
-					when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
-					default		{return 0}
-				}
+	for($hash_rule->{"is"}) {
+		when("Num") {
+			for ($hash_rule->{"for"}) {
+				when("==")	{ $val == $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when("!=")	{ $val != $hash_rule->{"val"} ? return 1 : return 0 ; }
+				default		{return 0}
 			}
 		}
-	} else {
-		my $val = ${$hash_line}->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
-
-		for($hash_rule->{"is"}) {
-			when("Num") {
-				for ($hash_rule->{"for"}) {
-					when("==")	{ $val == $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("!=")	{ $val != $hash_rule->{"val"} ? return 1 : return 0 ; }
-					default		{return 0}
-				}
-			}
-			when("Str") {
-				for ($hash_rule->{"for"}) {
-					when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
-					when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
-					default		{return 0}
-				}
+		when("Str") {
+			for ($hash_rule->{"for"}) {
+				when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
+				# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
+				# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
+				# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
+				# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
+				default		{return 0}
 			}
 		}
 	}
@@ -453,4 +368,100 @@ sub check_condition {
 		when("and")	{ ($false == 0) ? return 1 : return 0 ; }
 	}
 }
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+=head2 compareVcf
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub compareVcf {
+	my ($self,@vcfs) = @_;
+
+	compareSimple(@vcfs);
+}
+
+=head2 compareSimple
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub compareSimple {
+	my ($self,@vcfs) = @_;
+
+	compareSimple(@vcfs);
+}
+
+=head2 speed_comp
+    About   : Reads a VCF line and splits it into a hash.
+    Usage   : my $x = parse_line($line);
+    Args    : line to parse.
+=cut
+sub speed_comp {
+	my ($self,$file_name) = @_;
+
+	print STDERR "Treat file : '$file_name'\n";
+	open(VCF,$file_name) or die ("Error !\n");
+	$file_name = basename($file_name);
+	my @all_lines;
+	my $hash_variants = {};
+	my $hash_header = {};
+
+	while(<VCF>) {
+		chomp($_);
+		my ($hash_line,$type) = parse_line($_,$hash_header);
+		if($type eq "HEADER") {
+			$hash_header = merge($hash_header,$hash_line);
+		} else {
+			my @alts = split(",",$hash_line->{"ALT"});
+			foreach my $alt (@alts) {
+				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
+				#print $ID."\n";
+				$hash_variants->{$ID} = $_;
+				#print Dumper $hash_variants;
+			}
+		}
+	}
+	close(VCF);
+	return $hash_variants;
+}
+=head2 speed_read
+    About   : Reads a VCF line and splits it into a hash.
+    Usage   : my $x = parse_line($line);
+    Args    : line to parse.
+=cut
+sub speed_read {
+	my ($self,$file_name) = @_;
+
+	print STDERR "Treat file : '$file_name'\n";
+	open(VCF,$file_name) or die ("Error !\n");
+	$file_name = basename($file_name);
+	my @all_lines;
+	my $hash_variants = {};
+	my $hash_header = {};
+
+	while(<VCF>) {
+		chomp($_);
+		my ($hash_line,$type) = parse_line($_,$hash_header);
+		if($type eq "HEADER") {
+			$hash_header = merge($hash_header,$hash_line);
+		} else {
+			my @alts = split(",",$hash_line->{"ALT"});
+			foreach my $alt (@alts) {
+				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
+				#print $ID."\n";
+				$hash_variants->{$ID} = $_;
+				#print Dumper $hash_variants;
+			}
+		}
+	}
+	close(VCF);
+	return $hash_variants;
+}
+
+
+
+
+
 1;
