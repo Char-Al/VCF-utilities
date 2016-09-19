@@ -24,6 +24,7 @@ sub read_vcf {
 	my $hash_header = {};
 	my $i = 0;
 	while(<VCF>) {
+		$j++;
 		chomp($_);
 		my ($hash_line,$type) = parse_line($_,$hash_header);
 		if($type eq "HEADER") {
@@ -46,17 +47,15 @@ sub read_vcf {
 =cut
 sub parse_line {
 	my ($line,$hash_header) = @_;
-	## Control line
 	if ( !$line ) { return undef; }
 
 	my %hash_line;
 	if($line =~ /^#/) {
-		%hash_line = parse_meta($line);
+		%hash_line = parse_meta($line,$cpt);
 		return (\%hash_line,"HEADER");
 	} else {
 		my $ncols = scalar(split("\t",$line));
 		if($ncols > 8) {
-			#print Dumper \$hash_header;
 			my ($chr, $pos, $ID, $ref, $alt, $qual, $filter, $info, $format, @formats) = split("\t",$line);%hash_line = (
 				"CHROM"		=> $chr,
 				"POS"		=> $pos,
@@ -84,7 +83,6 @@ sub parse_line {
 		return (\%hash_line,"Var");
 
 	}
-	#print Dumper \%hash_line;
 }
 
 =head2 parse_info
@@ -100,7 +98,6 @@ sub parse_info {
 
 	foreach my $value (@infos) {
 		my @values = split("=",$value);
-		#print $values[0]."\n";
 		if ($hash_header->{'meta-informations'}->{"INFO"}->{$values[0]}->{"Type"} eq "Flag") {
 			$hash_info{$values[0]} = "TRUE";
 		} else {
@@ -142,16 +139,19 @@ sub parse_format {
     Args    : line to parse
 =cut
 sub parse_meta {
-	my $line=shift(@_);
-
+	my ($line) = @_;
 	my %hash_meta;
 	if ($line =~ /##([a-zA-Z0-9\-\.^,]*)=([a-zA-Z0-9\-\.^,]*)$/) {
 		$hash_meta{"meta-informations"}{$1} = $2;
 	} elsif($line =~ /##([^=]*)=<ID=([^,]*)(,Number=)*([^,]*)(,Type=)*([^,]*),Description="([^"]*).*/) {
-		if($7) {$hash_meta{"meta-informations"}{$1}{$2}{"Description"} = $7};
-		if($6) {$hash_meta{"meta-informations"}{$1}{$2}{"Type"} = $6};
-		if($4) {$hash_meta{"meta-informations"}{$1}{$2}{"Number"} = $4};
-		$hash_meta{"meta-informations"}{$1}{$2}{"line"} = $_;
+			if ($1 eq "INFO") {
+				$i++;
+			}
+			if($7) {$hash_meta{"meta-informations"}{$1}{$2}{"Description"} = $7};
+			if($6) {$hash_meta{"meta-informations"}{$1}{$2}{"Type"} = $6};
+			if($4) {$hash_meta{"meta-informations"}{$1}{$2}{"Number"} = $4};
+			$hash_meta{"meta-informations"}{$1}{$2}{"line"} = $_;
+			$hash_meta{"meta-informations"}{$1}{$2}{"order"} = $i;
 	}  elsif($line =~ /^#CHROM/) {
 		substr($_, 0, 1) = "";
 		my @header = split("\t",$_);
@@ -184,9 +184,9 @@ sub vcf2tab {
 		push(@direct, $$header[$i]);
 	}
 	foreach my $info (sort keys $meta->{'INFO'}) {
-		$line .= $info."\t";
-		push(@infos, $info);
+		$infos[$meta->{"INFO"}->{$info}->{'order'}-1] = $info;
 	}
+	$line .= join("\t",@infos)."\t";
 
 	foreach my $format (sort keys $meta->{'FORMAT'}) {
 		push(@formats,$format);
@@ -204,10 +204,10 @@ sub vcf2tab {
 		$line = "";
 		my $hash_variant = $variants->{$variant};
 		foreach my $val (@direct){
-			#print $val;
 			$line .= ${$hash_variant}->{$val}."\t";
 		}
 		foreach my $info (@infos) {
+
 			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
 				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
 			} else {
@@ -250,14 +250,13 @@ sub vcfCondFilter {
 			);
 
 			foreach my $rules (sort keys $cond->{$key}->{"rules"}) {
-				# $boolean_rules{check_filter($cond{$key}{"rules"}{$rules},$variant)}++;
 				$boolean_rules{check_filter($cond->{$key}->{"rules"}->{$rules}, $vcf->{"variants"}->{$variant})}++;
 			}
 
 			my $verify = check_condition($cond->{$key}->{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
 
 			my $check ="";
-			#print $cond->{$key}->{"step"};
+
 			for ($cond->{$key}->{"step"}) {
 				when("next")	{ if ($verify) { next; }									else { $check = "next_line"}	}
 				when("get")		{ if ($verify) { $filter{$variant} = $vcf->{"variants"}->{$variant} ; $check = "next_line"; }	else { next ; }					}
@@ -319,15 +318,13 @@ sub parseConfFile {
 =cut
 sub check_filter {
 	my ($hash_rule, $hash_line) = @_;
-		#print Dumper $hash_rule;
-		#print Dumper $hash_line;
 	my $val = "";
+
 	if($hash_rule->{"target"} eq "BASE"){
 		$val = ${$hash_line}->{$hash_rule->{"id"}};
 	} else {
 		$val = ${$hash_line}->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
 	}
-	#print Dumper $val;
 
 	for($hash_rule->{"is"}) {
 		when("Num") {
@@ -417,9 +414,7 @@ sub speed_comp {
 			my @alts = split(",",$hash_line->{"ALT"});
 			foreach my $alt (@alts) {
 				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
-				#print $ID."\n";
 				$hash_variants->{$ID} = $_;
-				#print Dumper $hash_variants;
 			}
 		}
 	}
@@ -450,9 +445,7 @@ sub speed_read {
 			my @alts = split(",",$hash_line->{"ALT"});
 			foreach my $alt (@alts) {
 				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
-				#print $ID."\n";
 				$hash_variants->{$ID} = $_;
-				#print Dumper $hash_variants;
 			}
 		}
 	}
