@@ -132,7 +132,7 @@ create using the prefix of the file (foo.vcf -> foo.tab).
 =over 1
 
 =item -
-Charles VAN GOETHEM (CHRU - Montpellier)
+Charles VAN GOETHEM (CHU - Montpellier)
 
 L<c-vangoethem@chu-montpellier.fr>
 
@@ -140,6 +140,9 @@ L<c-vangoethem@chu-montpellier.fr>
 Pauline SARRAROLS (CHU - Reims)
 
 L<psararols@chu-reims.fr>
+
+=item -
+Charly MATHIEU (Université de Montpellier 1 - Montpellier)
 
 =back
 
