@@ -84,7 +84,7 @@ if ($output ne "") {
 
 my $hash_vcf = VCF->read_vcf($file);
 my $hash_cond = VCF->parseConfFile($conf);
-my $filter = VCF->vcfCondFilter($hash_vcf, $hash_cond);
+my $filter = VCF->vcfCondFilter_old($hash_vcf, $hash_cond);
 
 ($name, $dir, $ext) = fileparse($file, qr/\.[^.]*/);
 my $output_file = $output.$name.".filter.tab";

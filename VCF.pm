@@ -38,6 +38,32 @@ sub read_vcf {
 	return merge($hash_header,$hash_variants);
 }
 
+=head2 read_header
+    About   : Reads the header only of a vcf
+    Usage   : my $x = read_vcf($file_name);
+    Args    : name of the vcf file
+=cut
+sub read_header {
+	my ($it,$file_name) = @_;
+
+	print STDERR "Treat file : '$file_name'\n";
+	open(VCF,$file_name) or die ("Error !\n");
+	$file_name = basename($file_name);
+	my $hash_header = {};
+	my $i = 0;
+	while(<VCF>) {
+		if(!(/^#/)) {
+			last;
+		}
+		chomp($_);
+		my ($hash_line,$type) = parse_line($_,$hash_header);
+		if($type eq "HEADER") {
+			$hash_header = merge($hash_header,$hash_line);
+		}
+	}
+	close(VCF);
+	return $hash_header;
+}
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 =head2 parse_line
@@ -170,67 +196,183 @@ sub parse_meta {
 		- output_file
 =cut
 sub vcf2tab {
-	my ($self, $header, $meta, $variants, $output) = @_;
+	my ($self, $header, $file, $output) = @_;
+	my $line;
 
 	open(FILE,">$output") or die "Cannot open file : '$output' $!";
+	($line, my $direct, my $infos, my $formats) = header2tab($header);
+	print FILE $line."\n";
 
-	my $line = "";
-	my @direct;
-	my @infos;
-	my @formats;
+	open(VCF,$file) or die ("Error ! Cannot open $file $!\n");
+	while(<VCF>) {
+		next if(/^#/);
+		chomp($_);
+		my ($hash_variant,$type) = parse_line($_,$header);
+		#print Dumper $hash_line;
 
-	foreach my $i (0..7-1) {
-		$line .= $$header[$i]."\t";
-		push(@direct, $$header[$i]);
+
+		$line = "";
+		$line = line2tab($hash_variant,$header,$direct,$infos,$formats);
+# 		foreach my $val (@{$direct}){
+# 			$line .= $hash_variant->{$val}."\t";
+# #			$line .= ${$hash_variant}->{$val}."\t";
+# 		}
+# 		foreach my $info (@{$infos}) {
+# 			if (exists ($hash_variant->{"INFO"}->{$info})) {
+# 				$line .= $hash_variant->{"INFO"}->{$info}."\t";
+# 			} else {
+# 				$line .= ".\t";
+# 			}
+# 		}
+# 		#
+# 		foreach my $i (9..scalar(@{$header->{"header"}})-1) {
+# 			my $sample = $header->{"header"}[$i];
+# 			foreach my $format (@formats) {
+# 				if (exists ($hash_variant->{"FORMAT"}->{$sample}->{$format})) {
+# 					$line .= $hash_variant->{"FORMAT"}->{$sample}->{$format}."\t";
+# 				} else {
+# 					$line .= ".\t";
+# 				}
+# 			}
+# 		}
+		print FILE $line."\n";
 	}
-	foreach my $info (sort keys $meta->{'INFO'}) {
-		$infos[$meta->{"INFO"}->{$info}->{'order'}-1] = $info;
+	close(FILE);
+	close(VCF);
+}
+=head2 vcf2tab_old
+    About   : Convert a vcf (hash) into a tab separate file
+    Usage   : my parse_meta($hash_vcf, $output);
+    Args    :
+		- hash of a vcf
+		- output_file
+=cut
+# sub vcf2tab_old {
+# 	my ($self, $header, $meta, $variants, $output) = @_;
+#
+# 	open(FILE,">$output") or die "Cannot open file : '$output' $!";
+#
+# 	my $line = "";
+# 	my @direct;
+# 	my @infos;
+# 	my @formats;
+#
+# 	foreach my $i (0..7-1) {
+# 		$line .= $$header[$i]."\t";
+# 		push(@direct, $$header[$i]);
+# 	}
+# 	foreach my $info (sort keys $meta->{'INFO'}) {
+# 		$infos[$meta->{"INFO"}->{$info}->{'order'}-1] = $info;
+# 	}
+# 	$line .= join("\t",@infos)."\t";
+#
+# 	foreach my $format (sort keys $meta->{'FORMAT'}) {
+# 		push(@formats,$format);
+# 	}
+#
+# 	foreach my $i (9..scalar(@{$header})-1) {
+# 		foreach my $format (@formats) {
+# 			$line .= $$header[$i]."_".$format."\t";
+# 		}
+# 	}
+# 	chop($line);
+# 	print FILE $line."\n";
+#
+# 	foreach my $variant (sort keys $variants) {
+# 		$line = "";
+# 		my $hash_variant = $variants->{$variant};
+# 		foreach my $val (@direct){
+# 			$line .= ${$hash_variant}->{$val}."\t";
+# 		}
+# 		foreach my $info (@infos) {
+#
+# 			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
+# 				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
+# 			} else {
+# 				$line .= ".\t";
+# 			}
+# 		}
+#
+# 		foreach my $i (9..scalar(@{$header})-1) {
+# 			my $sample = $$header[$i];
+# 			foreach my $format (@formats) {
+# 				if (exists (${$hash_variant}->{"FORMAT"}->{$sample}->{$format})) {
+# 					$line .= ${$hash_variant}->{"FORMAT"}->{$sample}->{$format}."\t";
+# 				} else {
+# 					$line .= ".\t";
+# 				}
+# 			}
+# 		}
+# 		print FILE $line."\n";
+# 	}
+# 	close(FILE);
+#
+# }
+
+=head2 header2tab
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub header2tab {
+	my ($header) = @_;
+	my $line;
+	foreach my $i (0..7-1) {
+		$line .= $header->{"header"}[$i]."\t";
+		push(@direct, $header->{"header"}[$i]);
+	}
+	#print STDERR  $line."\n";
+
+	foreach my $info (sort keys $header->{'meta-informations'}->{'INFO'}) {
+		$infos[$header->{'meta-informations'}->{"INFO"}->{$info}->{'order'}-1] = $info;
 	}
 	$line .= join("\t",@infos)."\t";
 
-	foreach my $format (sort keys $meta->{'FORMAT'}) {
+	foreach my $format (sort keys $header->{'meta-informations'}->{'FORMAT'}) {
 		push(@formats,$format);
 	}
 
-	foreach my $i (9..scalar(@{$header})-1) {
+	foreach my $i (9..scalar(@{$header->{"header"}})-1) {
 		foreach my $format (@formats) {
-			$line .= $$header[$i]."_".$format."\t";
+			$line .= $header->{"header"}[$i]."_".$format."\t";
 		}
 	}
 	chop($line);
-	print FILE $line."\n";
+	return $line, \@direct, \@infos, \@formats;
+}
 
-	foreach my $variant (sort keys $variants) {
-		$line = "";
-		my $hash_variant = $variants->{$variant};
-		foreach my $val (@direct){
-			$line .= ${$hash_variant}->{$val}."\t";
+=head2 line2tab
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub line2tab {
+	my ($hash_line,$header,$direct,$infos,$formats) = @_;
+	my $line = "";
+	my $hash_variant = $hash_line;
+	foreach my $val (@direct){
+		$line .= $hash_variant->{$val}."\t";
+			#$line .= ${$hash_variant}->{$val}."\t";
+	}
+	foreach my $info (@infos) {
+		if (exists ($hash_variant->{"INFO"}->{$info})) {
+			$line .= $hash_variant->{"INFO"}->{$info}."\t";
+		} else {
+			$line .= ".\t";
 		}
-		foreach my $info (@infos) {
-
-			if (exists (${$hash_variant}->{"INFO"}->{$info})) {
-				$line .= ${$hash_variant}->{"INFO"}->{$info}."\t";
+	}
+	foreach my $i (9..scalar(@{$header->{"header"}})-1) {
+		my $sample = $header->{"header"}[$i];
+		foreach my $format (@{$formats}) {
+			if (exists ($hash_variant->{"FORMAT"}->{$sample}->{$format})) {
+				$line .= $hash_variant->{"FORMAT"}->{$sample}->{$format}."\t";
 			} else {
 				$line .= ".\t";
 			}
 		}
-
-		foreach my $i (9..scalar(@{$header})-1) {
-			my $sample = $$header[$i];
-			foreach my $format (@formats) {
-				if (exists (${$hash_variant}->{"FORMAT"}->{$sample}->{$format})) {
-					$line .= ${$hash_variant}->{"FORMAT"}->{$sample}->{$format}."\t";
-				} else {
-					$line .= ".\t";
-				}
-			}
-		}
-		print FILE $line."\n";
 	}
-	close(FILE);
-
+	return $line;
 }
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 =head2 vcfCondFilter
@@ -239,6 +381,85 @@ sub vcf2tab {
     Args    :
 =cut
 sub vcfCondFilter {
+	my ($self,$header,$file,$cond) = @_;
+	my %filter;
+
+	open(VCF,$file) or die ("Error ! Cannot open $file_name $!\n");
+	my $i=0;
+	while(<VCF>) {
+		next if(/^#/);
+		chomp($_);
+		$i++;
+		my ($hash_variant,$type) = parse_line($_,$header);
+		foreach my $key (sort keys($cond)) {
+			my %boolean_rules = (
+				1 => 0,
+				0 => 0
+			);
+
+			foreach my $rules (sort keys $cond->{$key}->{"rules"}) {
+				$boolean_rules{check_filter($cond->{$key}->{"rules"}->{$rules}, $hash_variant)}++;
+			}
+
+			my $verify = check_condition($cond->{$key}->{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
+
+			my $check ="";
+
+			for ($cond->{$key}->{"step"}) {
+				when("next")	{ if ($verify) { next; }									else { $check = "next_line"}	}
+				when("get")		{ if ($verify) { $filter{$i} = $hash_variant ; $check = "next_line"; }	else { next ; }					}
+				when("stop")	{ if ($verify) { $filter{$i} = $hash_variant ; $check = "next_line"; }	else { $check = "next_line"}	}
+			}
+			if ($check eq "next_line") {
+				last;
+			}
+		}
+	}
+
+
+
+
+
+
+
+
+
+
+	# foreach my $variant (sort keys $vcf->{"variants"}) {
+	# 	my $hash_variant = $vcf->{"variants"}->{$variant};
+	# 	foreach my $key (sort keys($cond)) {
+	# 		my %boolean_rules = (
+	# 			1 => 0,
+	# 			0 => 0
+	# 		);
+	#
+	# 		foreach my $rules (sort keys $cond->{$key}->{"rules"}) {
+	# 			$boolean_rules{check_filter($cond->{$key}->{"rules"}->{$rules}, $vcf->{"variants"}->{$variant})}++;
+	# 		}
+	#
+	# 		my $verify = check_condition($cond->{$key}->{"cond"},$boolean_rules{1},$boolean_rules{0}) ;
+	#
+	# 		my $check ="";
+	#
+	# 		for ($cond->{$key}->{"step"}) {
+	# 			when("next")	{ if ($verify) { next; }									else { $check = "next_line"}	}
+	# 			when("get")		{ if ($verify) { $filter{$variant} = $vcf->{"variants"}->{$variant} ; $check = "next_line"; }	else { next ; }					}
+	# 			when("stop")	{ if ($verify) { $filter{$variant} = $vcf->{"variants"}->{$variant} ; $check = "next_line"; }	else { $check = "next_line"}	}
+	# 		}
+	#
+	# 		if ($check eq "next_line") {
+	# 			last;
+	# 		}
+	# 	}
+	# }
+	return \%filter;
+}
+=head2 vcfCondFilter_old
+    About   :
+    Usage   :
+    Args    :
+=cut
+sub vcfCondFilter_old {
 	my ($self,$vcf,$cond) = @_;
 	my %filter;
 	foreach my $variant (sort keys $vcf->{"variants"}) {
@@ -319,11 +540,11 @@ sub parseConfFile {
 sub check_filter {
 	my ($hash_rule, $hash_line) = @_;
 	my $val = "";
-
+	print Dumper $hash_line;
 	if($hash_rule->{"target"} eq "BASE"){
-		$val = ${$hash_line}->{$hash_rule->{"id"}};
+		$val = $hash_line->{$hash_rule->{"id"}};
 	} else {
-		$val = ${$hash_line}->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
+		$val = $hash_line->{$hash_rule->{"target"}}->{$hash_rule->{"id"}};
 	}
 
 	for($hash_rule->{"is"}) {

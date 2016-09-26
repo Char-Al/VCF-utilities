@@ -77,11 +77,12 @@ if ($output ne "") {
 
 
 foreach my $file (@files) {
-    my ($name, $dir, $ext) = fileparse($file,, qr/\.[^.]*/);
+    my ($name, $dir, $ext) = fileparse($file, qr/\.[^.]*/);
     #$file = basename($file);
     my $output_file = $output.$name.".tab";
-    my $hash = VCF->read_vcf($file);
-    VCF->vcf2tab($hash->{"header"}, $hash->{"meta-informations"}, $hash->{"variants"},$output_file);
+    #my $hash = VCF->read_vcf($file);
+	my $header = VCF->read_header($file);
+    VCF->vcf2tab($header,$file,$output_file);
 }
 
 

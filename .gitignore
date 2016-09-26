@@ -3,3 +3,4 @@ data_p/
 *.conf
 *.tab
 .DS_Store
+test*
