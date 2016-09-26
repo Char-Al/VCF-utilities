@@ -238,13 +238,15 @@ sub header2tab {
 	}
 	$line .= join("\t",@infos)."\t";
 
-	foreach my $format (sort keys $header->{'meta-informations'}->{'FORMAT'}) {
-		push(@formats,$format);
-	}
+	if(exists $header->{'meta-informations'}->{'FORMAT'}){
+		foreach my $format (sort keys $header->{'meta-informations'}->{'FORMAT'}) {
+			push(@formats,$format);
+		}
 
-	foreach my $i (9..scalar(@{$header->{"header"}})-1) {
-		foreach my $format (@formats) {
-			$line .= $header->{"header"}[$i]."_".$format."\t";
+		foreach my $i (9..scalar(@{$header->{"header"}})-1) {
+			foreach my $format (@formats) {
+				$line .= $header->{"header"}[$i]."_".$format."\t";
+			}
 		}
 	}
 	chop($line);
