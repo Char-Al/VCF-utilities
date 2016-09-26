@@ -82,14 +82,15 @@ if ($output ne "") {
 ##########################################################################################
 
 
-my $hash_vcf = VCF->read_vcf($file);
-my $hash_cond = VCF->parseConfFile($conf);
-my $filter = VCF->vcfCondFilter_old($hash_vcf, $hash_cond);
+
 
 ($name, $dir, $ext) = fileparse($file, qr/\.[^.]*/);
-my $output_file = $output.$name.".filter.tab";
+my $output_tab = $output.$name.".filter.tab";
+my $output_vcf = $output.$name.".filter.vcf";
 
-VCF->vcf2tab($hash_vcf->{"header"}, $hash_vcf->{"meta-informations"}, $filter,$output_file);
+my $header = VCF->read_header($file);
+my $hash_cond = VCF->parseConfFile($conf);
+my $filter = VCF->vcfCondFilter($header, $file, $hash_cond, $output_vcf, $output_tab);
 
 
 
