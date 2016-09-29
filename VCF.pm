@@ -40,7 +40,7 @@ sub read_vcf {
 
 =head2 read_header
     About   : Reads the header only of a vcf
-    Usage   : my $x = read_vcf($file_name);
+    Usage   : my $x = read_header($file_name);
     Args    : name of the vcf file
 =cut
 sub read_header {
@@ -57,9 +57,9 @@ sub read_header {
 		}
 		chomp($_);
 		my ($hash_line,$type) = parse_line($_,$hash_header);
-		if($type eq "HEADER") {
+		#if($type eq "HEADER") {
 			$hash_header = merge($hash_header,$hash_line);
-		}
+		#}
 	}
 	close(VCF);
 	return $hash_header;
@@ -502,10 +502,10 @@ sub compareSimple {
 
 =head2 speed_comp
     About   : Reads a VCF line and splits it into a hash.
-    Usage   : my $x = parse_line($line);
+    Usage   : my $x = read_comp($line);
     Args    : line to parse.
 =cut
-sub speed_comp {
+sub read_comp {
 	my ($self,$file_name) = @_;
 
 	print STDERR "Treat file : '$file_name'\n";
@@ -524,47 +524,127 @@ sub speed_comp {
 			my @alts = split(",",$hash_line->{"ALT"});
 			foreach my $alt (@alts) {
 				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
-				$hash_variants->{$ID} = $_;
+				$hash_variants->{$ID} = $hash_line;
 			}
 		}
 	}
 	close(VCF);
 	return $hash_variants;
 }
-=head2 speed_read
+=head2 speed_comp
     About   : Reads a VCF line and splits it into a hash.
     Usage   : my $x = parse_line($line);
     Args    : line to parse.
 =cut
-sub speed_read {
-	my ($self,$file_name) = @_;
+sub speed_comp {
+	my ($self,$file_name,$hash_header,$hash_count,$id_file) = @_;
 
-	print STDERR "Treat file : '$file_name'\n";
 	open(VCF,$file_name) or die ("Error !\n");
-	$file_name = basename($file_name);
-	my @all_lines;
-	my $hash_variants = {};
-	my $hash_header = {};
+	my ($name, $dir, $ext) = fileparse($file_name, qr/\.[^.]*/);
+
+	my $hash_line; my $type;
 
 	while(<VCF>) {
+		next if (/^#/);
 		chomp($_);
-		my ($hash_line,$type) = parse_line($_,$hash_header);
-		if($type eq "HEADER") {
-			$hash_header = merge($hash_header,$hash_line);
-		} else {
-			my @alts = split(",",$hash_line->{"ALT"});
-			foreach my $alt (@alts) {
-				my $ID = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$hash_line->{"REF"}."_".$alt;
-				$hash_variants->{$ID} = $_;
+		($hash_line,$type) = parse_line($_,$hash_header);
+		my @alts = split(",",$hash_line->{"ALT"});
+		foreach my $alt (@alts) {
+			if($alt !~ m/[ACGTNacgtn]/g) {
+				$alt = "-";
+			}
+			my $ref =$hash_line->{"REF"};
+			if($hash_line->{"REF"} !~ m/[ACGTNacgtn]/g) {
+				$ref = "-";
+			}
+			my $variant = $hash_line->{"CHROM"}."_".$hash_line->{"POS"}."_".$ref."_".$alt;
+			#$hash_count->{$variant}->{"count"}++;
+			#if(exists $hash_count->{$variant}){
+			if(exists $hash_count->{$variant} && ($hash_count->{$variant} !~ m/$id_file/g)) {
+				$hash_count->{$variant}.= "-".$id_file;
+			} else {
+				$hash_count->{$variant} = $id_file;
 			}
 		}
+		#print Dumper $hash_line;
 	}
-	close(VCF);
-	return $hash_variants;
+	return $hash_count;
 }
 
+sub makeVennComp {
+	my ($self,$hash_count,$output,$n) = @_;
 
+	my %hash_r;
 
+	my %inverse;
+	my @counts;
+	my $i=0;
+	my $lineH;
+	my $lineC;
+	my $lineDV;
+	push @{ $inverse{ $hash_count->{$_} } }, $_ for keys %{$hash_count};
+	foreach my $keys (sort keys %inverse){
+		my $count = @{$inverse{$keys}};
+		# $lineDV .= ($i+1).":".($i+$count)."\t";
+		my @key=split("-",$keys);
+		foreach my $k (@key) {
+			push(@{$hash_r{$k}},($i+1).":".($i+$count));
+		}
+		$i += $count;
+		$lineH .= $keys."\t";
+		$lineC .= $count."\t";
+	}
+	chop($lineH);
+	chop($lineC);
+	# chop($lineDV);
+	print $lineH."\n";
+	print $lineC."\n";
+	# print $lineDV."\n";
 
+	my $cmd_R = "library(VennDiagram) ;\n";
+	$cmd_R .= "venn.plot <- venn.diagram(\n";
+	$cmd_R .= "\tx = list(\n";
+	foreach my $key (keys %hash_r) {
+		$lineDV .= "\t\t".$key."=c(";
+		foreach my $e  (@{$hash_r{$key}}) {
+			$lineDV .= $e.",";
+		}
+		chop $lineDV;
+		$lineDV .= "),\n";
+	}
+	chop $lineDV;
+	chop $lineDV;
+	$cmd_R .= $lineDV."\n";
+	$cmd_R .= "\t),\n";
+	$cmd_R .= "\tfilename = \"$output/Venn.png\",\n";
+	$cmd_R .= "fill = rainbow($n),\n";
+	$cmd_R .= "imagetype = \"png\",\n";
+	$cmd_R .= "col = \"transparent\",\n";
+	$cmd_R .= "scaled = TRUE,\n";
+	if ($n == 3){
+		$cmd_R .= "cat.dist = -0.05,\n";
+	}
+	if ($n > 3){
+		$cmd_R .= "cat.dist = 0.09,\n";
+	}
+	# if ($n == 2){
+	# 	$cmd_R .= "cat.dist = 0.0,\n";
+	# }
+	$cmd_R .= "label.col = \"#160A16\",\n";
+	#$cmd_R .= "fontface = \"bold\",";
+	$cmd_R .= "cat.fontface = \"bold\",\n";
+	$cmd_R .= ");";
+
+	print "$n\n\n";
+	open(RSCRIPT,">rscript-venn.R") or die ("cannot create 'rscript.R' $!");
+
+	print RSCRIPT $cmd_R;
+
+	close(RSCRIPT);
+
+	system("Rscript rscript-venn.R");
+	system("rm rscript-venn.R");
+	system("rm $output/Venn.png*.log")
+}
 
 1;

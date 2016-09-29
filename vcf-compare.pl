@@ -77,19 +77,30 @@ if ($output ne "") {
 ##########################################################################################
 
 
-my @vcfs;
+my $hash_count;
+my $id_file = "FILE_";
+my %hash_file;
+my $i = 0;
 foreach my $file (@files) {
     my ($name, $dir, $ext) = fileparse($file,, qr/\.[^.]*/);
     #$file = basename($file);
     my $output_file = $output.$name.".tab";
-    my $var = VCF->speed_comp($file);
-	#print Dumper $var;
-	push(@vcfs,$var);
+	my $header = VCF->read_header($file);
+    #my $var = VCF->read_comp($file);
+	$i++;
+	$id_file="FILE_$i";
+	$hash_file{$id_file} = $name;
+    $hash_count = VCF->speed_comp($file,$header,$hash_count,$id_file);
 }
+# print Dumper \@vcfs;
+# foreach my $variant (sort keys $hash_count){
+# 	print $hash_count->{$variant}->{"count"};
+# }
+my $n = @files;
+VCF->makeVennComp($hash_count,$output,$n);
 
-
-
-print Dumper @vcfs;
+#print Dumper $vcfs[1]->{"20_1234567_GTCT_G"}->{"FILTER"};
+#print Dumper @vcfs;
 
 
 
