@@ -97,137 +97,8 @@ foreach my $file (@files) {
 # 	print $hash_count->{$variant}->{"count"};
 # }
 my $n = @files;
-VCF->makeVennComp($hash_count,$output,$n);
+if ($n <= 5) { VCF->makeVennComp($hash_count,$output,$n) }
 
-#print Dumper $vcfs[1]->{"20_1234567_GTCT_G"}->{"FILTER"};
-#print Dumper @vcfs;
-
-
-
-
-
-
-
-
-
-
-
-#
-# my %HEADER;
-# my %VARIANTS;
-#
-# foreach my $file (@files) {
-# 	print STDERR "Treat file : '$file'\n";
-# 	open(VCF,$file) or die ("Error !\n");
-# 	#$INFOS{$file};
-# 	$file = basename($file);
-# 	my @all_lines;
-# 	while(<VCF>) {
-# 		chomp($_);
-# 		if(/^#/) {
-# 			if(/INFO=<ID=([^,]*).*Description="([^"]*).*/) {
-# 				$HEADER{$file}{"INFO"}{$1}{"desc"} = $2;
-# 				$HEADER{$file}{"INFO"}{$1}{"line"} = $_;
-# 			}
-# 			if(/FORMAT=<ID=([^,]*).*Description="([^"]*).*/) {
-# 				$HEADER{$file}{"FORMAT"}{$1}{"desc"} = $2;
-# 				$HEADER{$file}{"FORMAT"}{$1}{"line"} = $_;
-# 			}
-# 		} else {
-# 			my @line = split("\t");
-# #			print Dumper \@line;
-# 			#$VARIANTS{$file}{"$line[0]_$line[1]_$line[3]_$line[4]"} = 1 ;
-# 			unless ($pass){
-# 				push(@{$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"files"}},$file) ;
-# 				$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"lines"} = $_ ;
-# 			} else {
-# 				if ($line[6] eq "PASS" && length($line[3]) == 1 && length($line[4]) == 1) {
-# 					push(@{$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"files"}},$file) ;
-# 					$VARIANTS{"$line[0]_$line[1]_$line[3]_$line[4]"}{"lines"} = $_ ;
-# 				}
-# 			}
-# 			my %hash_line = parse_line($_);
-# 			#print Dumper \%hash_line;
-# 			push(@all_lines,\%hash_line);
-# 		}
-# 	}
-# 	#print Dumper \@all_lines;
-# 	close(VCF);
-# }
-#
-# ##########################################################################################
-# ##########################################################################################
-#
-#
-# my %TREAT_VARIANTS;
-# my %VCF;
-# foreach my $key (keys(%VARIANTS)){
-# 	if( @{$VARIANTS{$key}{"files"}} == 1) {
-# 		my $name = substr(${$VARIANTS{$key}{"files"}}[0],0,-4);
-# 		$TREAT_VARIANTS{$name}{"count"} += 1;
-# 		$TREAT_VARIANTS{$name}{"vcf"} .= $VARIANTS{$key}{"lines"}."\n";
-# 	} else {
-# 		my $name = "common_";
-# 		foreach my $names (@{$VARIANTS{$key}{"files"}}) {
-# 			$name .= substr($names,0,-4)."_AND_";
-# 		}
-# 		$name = substr($name, 0, -5);
-# 		$TREAT_VARIANTS{$name}{"count"} += 1;
-# 		$TREAT_VARIANTS{$name}{"vcf"} .= $VARIANTS{$key}{"lines"}."\n";
-# 	}
-# }
-#
-# # print Dumper \%HEADER;
-# # print Dumper \%VARIANTS;
-# # print Dumper \%TREAT_VARIANTS;
-#
-# foreach my $key (keys(%TREAT_VARIANTS)) {
-# 	open(FILE, ">".$output.$key.".compare") or die("Cannot open $output$key");
-# 	print FILE $TREAT_VARIANTS{$key}{"vcf"};
-# 	print $key." : ".$TREAT_VARIANTS{$key}{"count"}."\n";
-# }
-#
-# ##########################################################################################
-# ##########################################################################################
-#
-#
-# sub parse_line {
-# 	my $line = shift(@_);
-# 	my ($chr, $pos, $ID, $ref, $alt, $qual, $filter, $info, $format, @formats) = split("\t",$line);
-# 	my @infos = split(";",$info);
-#
-# 	my %hash_line = (
-# 		"chr"	=> $chr,
-# 		"pos"	=> $pos,
-# 		"ID"	=> $ID,
-# 		"ref"	=> $ref,
-# 		"alt"	=> $alt,
-# 		"qual"	=> $qual,
-# 		"filter"	=> $filter
-# 	);
-# 	#print Dumper \%hash_line;
-#
-# 	# Add each each formats
-# 	my $i=1;
-# 	my @all_formats = split(":",$format);
-# 	#$hash_line{"format"}{"format"} = $format;
-# 	foreach my $element (@formats) {
-# 		my @elements = split(":",$element);
-# 		for my $j (0..(@all_formats-1)){
-# 			$hash_line{"format"}{"indiv".$i}{$all_formats[$j]} = $elements[$j];
-# 		}
-# 		$i++;
-# 	}
-#
-# 	# Add each infos
-# 	foreach my $value (@infos) {
-# 		my @values = split("=",$value);
-# 		$hash_line{"infos"}{$values[0]} = $values[1];
-# 	}
-#
-# 	#print Dumper \%hash_line;
-# 	return %hash_line;
-# }
 
 
 ##########################################################################################
@@ -241,48 +112,74 @@ __END__
 
 =head1 NAME
 
-compare_leon.pl - Compare Leon compression algorithm with gzip (generally used) for fastQ.
+vcf-compare.pl - Compare 2 or more vcf
 
 =head1 VERSION
 
 version 0.01
 
-=head1 SYNOPSIS
+=head1 USAGE
 
-compare_leon.pl  -f file.fastq (-f file2.fastq,file3.fastq) -d directory/with/some/fastq
+    perl vcf-compare.pl  -f file1.vcf -f file2.vcf[,file4.vcf -f file5.vcf...] [-o output_repertory]
 
 =head1 DESCRIPTION
 
-This script compress and uncompress automatically some fastQ file.
+This script compare twor or more vcf.
+Comparison is only based on the variant at this time (chr:pos-ref-alt).
+The script will generate a vcf for each list of variant.
+Furthermore it creates a Venn Diagramm if 5 or less vcf are compared.
 
 =head1 OPTIONS
 
-=head2 General
-
-	-h,--help		Print this help
-	-m,--man		Open man page
-	-v,--verbosity		Level of verbosity
-
 =head2 Mandatory arguments
 
-	-f,--file=file.fastq			Specify the fastq file you want use (possible multiple file)
-	-d,--directory=path/to/directory	Specify a directory contains some fastq you want use (possible multiple directory)
+	-f,--file file.vcf		vcf to compare
 
 =head2 Optional arguments
 
-	-o,--output=repertory			You can specify the output repertory (default Current)
-	-g,--makeGraphs					Generate automatically awesome graphs with R and ggplot2
+	-o,--output /path/output	output repertory (Default : current)
+
+=head2 General
+
+	-h,--help	Print this help
+	-m,--man	Open man page
 
 =head1 AUTHORS
 
-=over 4
+=over 1
 
 =item -
-Charles VAN GOETHEM
+Charles VAN GOETHEM (CHU - Montpellier)
+
+L<c-vangoethem@chu-montpellier.fr>
 
 =item -
-Pauline SARRAROLS
+Pauline SARRAROLS (CHU - Reims)
+
+L<psararols@chu-reims.fr>
+
+=item -
+Charly MATHIEU (Université de Montpellier 1 - Montpellier)
 
 =back
+
+=head1 LICENSE
+
+Copyright (c) 2016 c-vangoethem, p-sararols
+
+This file is part of VCF-utilities.
+
+VCF-utilities is free tools: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+VCF-utilities is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with VCF-utilities. If not, see <http://www.gnu.org/licenses/>.
 
 =cut

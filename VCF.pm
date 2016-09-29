@@ -450,12 +450,15 @@ sub check_filter {
 		}
 		when("Str") {
 			for ($hash_rule->{"for"}) {
+				my $val_filter = $hash_rule->{"val"};
 				when("==")	{ $val eq $hash_rule->{"val"} ? return 1 : return 0 ; }
 				# when(">=")	{ $val >= $hash_rule->{"val"} ? return 1 : return 0 ; }
 				# when("<=")	{ $val <= $hash_rule->{"val"} ? return 1 : return 0 ; }
 				# when(">")	{ $val >  $hash_rule->{"val"} ? return 1 : return 0 ; }
 				# when("<")	{ $val <  $hash_rule->{"val"} ? return 1 : return 0 ; }
 				when("!=")	{ $val ne $hash_rule->{"val"} ? return 1 : return 0 ; }
+				when("=~")	{ print $val."- -".$val_filter."\n";$val =~ m/$val_filter/i ? return 1 : return 0 ; }
+				when("!~")	{ $val !~ m/$val_filter/i ? return 1 : return 0 ; }
 				default		{return 0}
 			}
 		}
