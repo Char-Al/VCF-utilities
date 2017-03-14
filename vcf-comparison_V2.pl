@@ -9,7 +9,7 @@ Returns: Tab-delimited or VCF file containing the common variants
 		 Tab-delimited or VCF file containing the unique variants  
     Env: Unix/Mac
  Author: Pauline Sararols (CHU Reims) <psararols@chu-reims.fr>
- 		 Charles VAN GOETHEM (CHU Montpellier) <c-vangoethem@chu-montpellier.fr>
+	 Charles VAN GOETHEM (CHU Montpellier) <c-vangoethem@chu-montpellier.fr>
 
 Version: v1.0
 
@@ -17,15 +17,12 @@ Version: v1.0
 Requirements :
 Perl 
 
-Test :
-perl test.pl --vcf_file 16M00064M.vcf,16M00064M.vcf,full_variant_table_S1.vcf -o t,v -g hg18 -s patient1
-
-
 VCF file
 #CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  NORMAL  TUMOUR
 1       5734214 4_1     G       G[4:131190349[  5       .       SVTYPE=BND;MATEID=4_2;IMPRECISE;CIPOS=0,484;CIEND=0,538;BKDIST=-1;OCC=1;TSRDS=HS26_07415:6:1204:11449:180778#145,HS26_07416:1:2203:6853:144722#145,HS26_07416:1:2206:18596:82992#145,HS8_07129:3:1107:18448:194691#145,HS8_07129:3:2206:17776:37193#145;SVCLASS=deletion        RC:PS   0:0     0:5
 
 =head1 SYNOPSIS
+The VCF files must be in the same folder. Launch from the folder of VCF files.
 
 perl vcf-comparison.pl -f file1.vcf,file2.vcf -o t,v -g refgenome -d folder -s sample
 
@@ -37,7 +34,7 @@ Options:
   --output_file            o      Name of file to write output of analysis
   --ref_genome             g      Reference Genome
   --directory              d      New Directory to run the analysis
-  --sample     			   s 	  Name of the sample
+  --sample     		   s 	  Name of the sample
 
 =cut
 
@@ -72,10 +69,9 @@ my @array_file;
 ### Open the VCF files to catch information in a hash
 foreach my $file (@files) {
 	my $vcf ;
-	my $vcf_file = $file ;
-	my %dataVCF ;
+ 	my %dataVCF ;
 	# Open VCF files and keep information in a hash 
-	open($vcf, '<:encoding(UTF-8)', $vcf_file) or die "Could not open file '$vcf' $!";
+	open($vcf, '<:encoding(UTF-8)', $file) or die "Could not open file '$vcf' $!";
 
 	foreach my $line (<$vcf>)  {
 		chomp $line;
@@ -84,7 +80,7 @@ foreach my $file (@files) {
 	 	if ( ($chr =~ m/(chr)([0-9])/) || ($chr =~ m/(chrom)([0-9])/) ) {				# Homogeneisation of the chromosomes name
 	 		$chr = $2 ;
 		}
-		my @list = ($chr, $pos, $id, $ref, $alt, $qual, $filter, $info) ; 				# Each line = an array (list)
+		my @list = ($chr, $pos, $id, $ref, $alt, $qual, $filter, $info, $file) ; 				# Each line = an array (list)
 		# Hash = Key(var) : Value(list of characteristics)
 	 	my $variant = "$chr$pos$ref$alt" ;												# Name of the key in the hash for each line (variant)
 	    $dataVCF{$variant} = \@list;													# Value = array with info of each variant
@@ -96,8 +92,6 @@ foreach my $file (@files) {
 	#$i++ ;
 	close $vcf or die "Can't close $vcf $!";
 }
-
-#print Dumper (@array_file);
 
 
 ### Comparison between the VCF files
@@ -146,13 +140,19 @@ my $common_var_tsv = $sample.'common_variants.tsv';
 ### Recover characteristics for common variants
 my %table_common ;
 foreach my $file (@array_file) {														# We are looking for characteristics of variants of the list @common
-	for my $key (keys $file) {															# We recover these characteritics thanks to %hash_file
-		if ( $key ~~ @common) {															# If the $key (var_id) is in the hash, we can keep it in another hash
-			$table_common{$key} = $$file{$key};
+	for my $key (keys $file) {
+		if ( $key ~~ @common) {	
+			#print "$key, $$file{$key}[8]\n" ;
+			if ( exists $table_common{$key}) {
+				push $table_common{$key}, $$file{$key}[8];
+			}	
+			else {													# If the $key (var_id) is in the hash, we can keep it in another hash
+				$table_common{$key} = $$file{$key};
+			}
 		}
 	}
 } 
-
+#print Dumper (%table_common) ;
 
 ### Write final files
 																					# List for already seen variant					
@@ -162,11 +162,10 @@ for my $letter (@format) {
 	if ($letter eq "t") {																# Construction of a TSV file if "t" is put in @output_file
 		open($tsv_f, '>', $common_var_tsv) or die "Could not open file '$tsv_f' $!";
 		get_tsv_format($tsv_f) ;
-		for my $var_common (sort keys %table_common) {
-			print "$var_common\n" ;													 
+		for my $var_common (sort keys %table_common) {												 
 			for my $var_hash (sort keys %hash_count_var) {									# To add the count of occurence in the TSV file, 
 				if ($var_common eq $var_hash) {											# We look for identical variant id in both hash to print it in the file
-					print $tsv_f "$table_common{$var_common}[0]\t$table_common{$var_common}[1]\t$table_common{$var_common}[2]\t$table_common{$var_common}[3]\t$table_common{$var_common}[4]\t$table_common{$var_common}[5]\t$table_common{$var_common}[6]\t$table_common{$var_common}[7]\t$hash_count_var{$var_hash}\n";
+					print $tsv_f "$table_common{$var_common}[0]\t$table_common{$var_common}[1]\t$table_common{$var_common}[2]\t$table_common{$var_common}[3]\t$table_common{$var_common}[4]\t$table_common{$var_common}[5]\t$table_common{$var_common}[6]\t$table_common{$var_common}[7]\t$hash_count_var{$var_hash}\t$table_common{$var_common}[8]\t$table_common{$var_common}[9]\n";
 				}
 			}														
 		}
@@ -215,7 +214,7 @@ for my $letter (@format) {
 		for my $var_uniq (sort keys %table_unique) {													# 
 			for my $var_hash (keys %hash_count_var) {
 				if ($var_uniq eq $var_hash) {
-					print $tsv_n "$table_unique{$var_uniq}[0]\t$table_unique{$var_uniq}[1]\t$table_unique{$var_uniq}[2]\t$table_unique{$var_uniq}[3]\t$table_unique{$var_uniq}[4]\t$table_unique{$var_uniq}[5]\t$table_unique{$var_uniq}[6]\t$table_unique{$var_uniq}[7]\t$hash_count_var{$var_hash}\n";
+					print $tsv_n "$table_unique{$var_uniq}[0]\t$table_unique{$var_uniq}[1]\t$table_unique{$var_uniq}[2]\t$table_unique{$var_uniq}[3]\t$table_unique{$var_uniq}[4]\t$table_unique{$var_uniq}[5]\t$table_unique{$var_uniq}[6]\t$table_unique{$var_uniq}[7]\t$hash_count_var{$var_hash}\t$table_unique{$var_uniq}[8]\n";
 				}
 			}														
 		}
