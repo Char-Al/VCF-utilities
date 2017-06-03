@@ -587,6 +587,7 @@ sub makeVennComp {
 	my $lineDV;
 	push @{ $inverse{ $hash_count->{$_} } }, $_ for keys %{$hash_count};
 	foreach my $keys (sort keys %inverse){
+		print Dumper @{$inverse{$keys}};
 		my $count = @{$inverse{$keys}};
 		# $lineDV .= ($i+1).":".($i+$count)."\t";
 		my @key=split("-",$keys);
